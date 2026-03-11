@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 
+const priorityOptions = ['Low', 'Medium', 'High']
+
 function AddTask({ isOpen, onClose, onAddTask }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [priority, setPriority] = useState('Medium')
   const titleInputRef = useRef(null)
 
   useEffect(() => {
     if (!isOpen) {
       setTitle('')
       setDescription('')
+      setDeadline('')
+      setPriority('Medium')
       return
     }
 
@@ -50,6 +56,8 @@ function AddTask({ isOpen, onClose, onAddTask }) {
     onAddTask({
       title: trimmedTitle,
       description: trimmedDescription,
+      deadline,
+      priority,
     })
   }
 
@@ -99,6 +107,31 @@ function AddTask({ isOpen, onClose, onAddTask }) {
               rows="4"
             />
           </label>
+
+          <div className="dialog-form__row">
+            <label className="dialog-form__field">
+              <span>Deadline</span>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(event) => setDeadline(event.target.value)}
+              />
+            </label>
+
+            <label className="dialog-form__field">
+              <span>Priority</span>
+              <select
+                value={priority}
+                onChange={(event) => setPriority(event.target.value)}
+              >
+                {priorityOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <div className="dialog-form__actions">
             <button
