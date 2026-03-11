@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import AddTask from '../../components/AddTask.jsx'
-
+import Snackbar from '@mui/material/Snackbar'
+import Alert from '@mui/material/Alert'
 
 const initialTasks = [
   {
@@ -32,9 +33,16 @@ const initialTasks = [
 function TaskList() {
   const [tasks, setTasks] = useState(initialTasks)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSnackbarOpen, setIsSnackbarOpen] = useState(false)
   const completedTasks = tasks.filter((task) => task.done).length
 
+  const handleSnackbarClose = (_, reason) => {
+    if (reason === 'clickaway') {
+      return
+    }
 
+    setIsSnackbarOpen(false)
+  }
 
   const handleAddTask = ({ title, description }) => {
     setTasks((currentTasks) => [
@@ -47,6 +55,7 @@ function TaskList() {
       ...currentTasks,
     ])
     setIsDialogOpen(false)
+    setIsSnackbarOpen(true)
   }
 
   return (
@@ -75,7 +84,7 @@ function TaskList() {
             </li>
           ))}
         </ul>
-
+       
         <button
           type="button"
           className="task-list-box__button"
@@ -86,6 +95,7 @@ function TaskList() {
           </span>
           Add Task
         </button>
+        
       </section>
 
       <AddTask
@@ -94,7 +104,21 @@ function TaskList() {
         onAddTask={handleAddTask}
       />
 
-
+      <Snackbar
+        open={isSnackbarOpen}
+        autoHideDuration={3000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity="success"
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          Task added successfully!
+        </Alert>
+      </Snackbar>
     </>
   )
 }
