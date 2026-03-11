@@ -1,6 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 
 const priorityOptions = ['Low', 'Medium', 'High']
+const statusOptions = [
+  { value: 'incomplete', label: 'Incomplete' },
+  { value: 'active', label: 'Active' },
+  { value: 'done', label: 'Done' },
+]
+const statusLabels = {
+  done: 'Done',
+  active: 'Active',
+  incomplete: 'Incomplete',
+}
 
 function formatDeadline(deadline) {
   if (!deadline) {
@@ -20,34 +32,37 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
   const [priority, setPriority] = useState('Medium')
+  const [status, setStatus] = useState('incomplete')
   const titleInputRef = useRef(null)
 
-  const syncForm = (sourceTask) => {
-    setTitle(sourceTask?.title ?? '')
-    setDescription(sourceTask?.description ?? '')
-    setDeadline(sourceTask?.deadline ?? '')
-    setPriority(sourceTask?.priority ?? 'Medium')
+  const handleClose = () => {
+    setIsEditing(false)
+    onClose()
   }
 
-  useEffect(() => {
-    if (!task) {
-      setIsEditing(false)
-      return
-    }
-
-    syncForm(task)
+  const handleDelete = () => {
     setIsEditing(false)
-  }, [task])
+    onDeleteTask(task.id)
+  }
+
+  const handleStartEditing = () => {
+    setTitle(task.title)
+    setDescription(task.description ?? '')
+    setDeadline(task.deadline ?? '')
+    setPriority(task.priority ?? 'Medium')
+    setStatus(task.status ?? 'incomplete')
+    setIsEditing(true)
+  }
+
+  const handleEscape = useEffectEvent((event) => {
+    if (event.key === 'Escape') {
+      handleClose()
+    }
+  })
 
   useEffect(() => {
     if (!task) {
       return undefined
-    }
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
     }
 
     const previousOverflow = document.body.style.overflow
@@ -58,7 +73,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [task, onClose])
+  }, [task])
 
   useEffect(() => {
     if (isEditing) {
@@ -88,17 +103,17 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
       description: description.trim(),
       deadline,
       priority,
+      status,
     })
     setIsEditing(false)
   }
 
   const handleCancelEdit = () => {
-    syncForm(task)
     setIsEditing(false)
   }
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={handleClose}>
       <div
         className="dialog-card dialog-card--detail"
         role="dialog"
@@ -114,7 +129,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
           <button
             type="button"
             className="dialog-card__close"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close task details dialog"
           >
             x
@@ -166,14 +181,33 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                   ))}
                 </select>
               </label>
+
+              <label className="dialog-form__field">
+                <span>Status</span>
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                >
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="dialog-form__actions">
               <button
                 type="button"
-                className="dialog-form__button dialog-form__button--danger"
-                onClick={() => onDeleteTask(task.id)}
+                className="dialog-form__button dialog-form__button--danger dialog-form__button--with-icon"
+                onClick={handleDelete}
               >
+                <DeleteOutlineRoundedIcon
+                  className="dialog-form__button-icon"
+                  fontSize="small"
+                  aria-hidden="true"
+                />
                 Delete Task
               </button>
               <button
@@ -210,21 +244,38 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                 <span>Priority</span>
                 <strong>{task.priority}</strong>
               </section>
+
+              <section
+                className={`task-detail__chip task-detail__chip--status-${task.status}`}
+              >
+                <span>Status</span>
+                <strong>{statusLabels[task.status] ?? 'Incomplete'}</strong>
+              </section>
             </div>
 
             <div className="task-detail__actions">
               <button
                 type="button"
-                className="dialog-form__button dialog-form__button--danger"
-                onClick={() => onDeleteTask(task.id)}
+                className="dialog-form__button dialog-form__button--danger dialog-form__button--with-icon"
+                onClick={handleDelete}
               >
+                <DeleteOutlineRoundedIcon
+                  className="dialog-form__button-icon"
+                  fontSize="small"
+                  aria-hidden="true"
+                />
                 Delete Task
               </button>
               <button
                 type="button"
-                className="dialog-form__button dialog-form__button--primary"
-                onClick={() => setIsEditing(true)}
+                className="dialog-form__button dialog-form__button--primary dialog-form__button--with-icon"
+                onClick={handleStartEditing}
               >
+                <EditOutlinedIcon
+                  className="dialog-form__button-icon"
+                  fontSize="small"
+                  aria-hidden="true"
+                />
                 Update Task
               </button>
             </div>

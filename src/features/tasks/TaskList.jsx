@@ -1,8 +1,22 @@
 import { useState } from 'react'
 import AddTask from '../../components/AddTask.jsx'
 import Desc from '../../components/Desc.jsx'
+import FilterButton from '../../components/FilterButton.jsx'
 import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
+
+const taskStatusLabels = {
+  done: 'Done',
+  active: 'Active',
+  incomplete: 'Incomplete',
+}
+
+const emptyStateMessages = {
+  all: 'No tasks yet. Add one to get started.',
+  done: 'No completed tasks yet.',
+  active: 'No active task right now.',
+  incomplete: 'No incomplete tasks at the moment.',
+}
 
 const initialTasks = [
   {
@@ -11,7 +25,7 @@ const initialTasks = [
     description: 'UI planning',
     deadline: '2026-03-14',
     priority: 'High',
-    done: true,
+    status: 'done',
   },
   {
     id: 2,
@@ -19,7 +33,7 @@ const initialTasks = [
     description: 'Component work',
     deadline: '2026-03-16',
     priority: 'Medium',
-    done: false,
+    status: 'active',
   },
   {
     id: 3,
@@ -27,7 +41,7 @@ const initialTasks = [
     description: 'React logic',
     deadline: '2026-03-18',
     priority: 'High',
-    done: false,
+    status: 'incomplete',
   },
   {
     id: 4,
@@ -35,7 +49,7 @@ const initialTasks = [
     description: 'Responsive pass',
     deadline: '2026-03-19',
     priority: 'Low',
-    done: true,
+    status: 'done',
   },
 ]
 
@@ -43,14 +57,24 @@ function TaskList() {
   const [tasks, setTasks] = useState(initialTasks)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
+  const [activeFilter, setActiveFilter] = useState('all')
   const [snackbarState, setSnackbarState] = useState({
     open: false,
     message: '',
     severity: 'success',
   })
-  const completedTasks = tasks.filter((task) => task.done).length
+  const completedTasks = tasks.filter((task) => task.status === 'done').length
   const selectedTask =
     tasks.find((task) => task.id === selectedTaskId) ?? null
+  const filterCounts = {
+    all: tasks.length,
+    done: completedTasks,
+    active: tasks.filter((task) => task.status === 'active').length,
+    incomplete: tasks.filter((task) => task.status === 'incomplete').length,
+  }
+  const filteredTasks = tasks.filter(
+    (task) => activeFilter === 'all' || task.status === activeFilter,
+  )
 
   const handleSnackbarClose = (_, reason) => {
     if (reason === 'clickaway') {
@@ -71,7 +95,13 @@ function TaskList() {
     })
   }
 
-  const handleAddTask = ({ title, description, deadline, priority }) => {
+  const handleAddTask = ({
+    title,
+    description,
+    deadline,
+    priority,
+    status,
+  }) => {
     setTasks((currentTasks) => [
       {
         id: Date.now(),
@@ -79,7 +109,7 @@ function TaskList() {
         description,
         deadline,
         priority,
-        done: false,
+        status,
       },
       ...currentTasks,
     ])
@@ -108,29 +138,47 @@ function TaskList() {
     <>
       <section className="task-list-box">
         <header className="task-list-box__header">
-          <div>
-            <h2>Task List</h2>
+          <div >
+            <h2 >Tasks </h2>
           </div>
           <span className="task-list-box__badge">
             {completedTasks}/{tasks.length} done
           </span>
         </header>
 
+        <FilterButton
+          activeFilter={activeFilter}
+          counts={filterCounts}
+          onFilterChange={setActiveFilter}
+        />
+
         <ul className="task-list" aria-label="Task list">
-          {tasks.map((task) => (
-            <li key={task.id}>
-              <button
-                type="button"
-                className={`task-item${task.done ? ' task-item--done' : ''}`}
-                onClick={() => setSelectedTaskId(task.id)}
-              >
-                <span className="task-item__marker" aria-hidden="true" />
-                <div className="task-item__content">
-                  <h3>{task.title}</h3>
-                </div>
-              </button>
-            </li>
-          ))}
+          {filteredTasks.length === 0 ? (
+            <li className="task-list__empty">{emptyStateMessages[activeFilter]}</li>
+          ) : (
+            filteredTasks.map((task) => (
+              <li key={task.id}>
+                <button
+                  type="button"
+                  className={`task-item task-item--${task.status}`}
+                  onClick={() => setSelectedTaskId(task.id)}
+                >
+                  <span className="task-item__marker" aria-hidden="true" />
+                  <div className="task-item__content">
+                    <h3>{task.title}</h3>
+                    <p>{task.description || 'No description added yet.'}</p>
+                  </div>
+                  <section
+                    className={`task-item__status task-item__status--${task.status}`}
+                    aria-label={`Task status ${taskStatusLabels[task.status]}`}
+                  >
+                    <span>Status</span>
+                    <strong>{taskStatusLabels[task.status]}</strong>
+                  </section>
+                </button>
+              </li>
+            ))
+          )}
         </ul>
 
         <button
@@ -162,7 +210,7 @@ function TaskList() {
         open={snackbarState.open}
         autoHideDuration={3000}
         onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert
           onClose={handleSnackbarClose}
