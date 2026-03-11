@@ -1,20 +1,32 @@
-<<<<<<< HEAD
-# React + Vite
+# Task Manager Web App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Task Manager Web App is a React + Vite project focused on making day-to-day task tracking feel fast and approachable. The app currently runs fully on the frontend and lets users add tasks with a title, optional description, deadline, and priority, open task details in a separate dialog, update or delete existing tasks, and get instant feedback through success snackbars. It is designed as a clean starting point for a richer productivity app that can later connect to a real backend and persistent database.
 
-Currently, two official plugins are available:
+## Install and Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
 
-## React Compiler
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Other useful commands:
 
-## Expanding the ESLint configuration
+```bash
+npm run dev
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-=======
-# Task-manager
->>>>>>> 492e552e462988745a4e6a302eb8c03a8d544e86
+```
+
+
+
+
+
+## Learnings & Challenges
+
+- Managing task data became easier once the list moved from static mock data into React state.
+- Keeping add, update, and delete flows consistent required a shared task shape with title, description, deadline, priority, and status.
+- Designing dialog-based flows highlighted the need for clear close behavior, keyboard handling, and focus management.
+- Making the list title-only while still keeping task details easy to access improved the main screen's readability.
+- Snackbar feedback helped reinforce successful actions without pulling users away from the task list.
+- Responsive layout work showed how quickly desktop-friendly task cards can feel crowded on smaller screens.
+
+
