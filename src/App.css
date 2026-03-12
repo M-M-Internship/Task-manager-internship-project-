@@ -122,6 +122,10 @@
   list-style: none;
 }
 
+.task-list__item {
+  list-style: none;
+}
+
 .task-filters {
   display: flex;
   flex-wrap: wrap;
@@ -172,8 +176,27 @@
   border: 1px dashed rgba(148, 163, 184, 0.35);
 }
 
+.task-item-shell {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.task-item__checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  accent-color: #ea580c;
+  cursor: pointer;
+}
+
+.task-item__checkbox:disabled {
+  cursor: wait;
+}
+
 .task-item {
   display: flex;
+  flex: 1;
   width: 100%;
   align-items: center;
   gap: 0.9rem;
@@ -245,6 +268,12 @@
 
 .task-item__content p {
   color: #64748b;
+}
+
+.task-item__content--done h3,
+.task-item__content--done p {
+  text-decoration: line-through;
+  opacity: 0.72;
 }
 
 .task-item__status {
@@ -572,6 +601,10 @@
   .task-item {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .task-item-shell {
+    align-items: flex-start;
   }
 
   .task-item__status {

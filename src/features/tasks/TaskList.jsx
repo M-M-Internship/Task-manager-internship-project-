@@ -167,7 +167,7 @@ function TaskList() {
     }
   }
 
-  const handleUpdateTask = async (updatedTask) => {
+  const persistTaskUpdate = async (updatedTask, successMessage) => {
     setIsSavingTask(true)
 
     try {
@@ -177,7 +177,7 @@ function TaskList() {
         currentTasks.map((task) => (task.id === savedTask.id ? savedTask : task)),
       )
       setLoadError('')
-      openSnackbar('Task updated successfully!')
+      openSnackbar(successMessage)
       return true
     } catch (error) {
       openSnackbar(
@@ -189,6 +189,18 @@ function TaskList() {
       setIsSavingTask(false)
     }
   }
+
+  const handleUpdateTask = async (updatedTask) =>
+    persistTaskUpdate(updatedTask, 'Task updated successfully!')
+
+  const handleToggleTaskDone = async (task, isDone) =>
+    persistTaskUpdate(
+      {
+        ...task,
+        status: isDone ? 'done' : 'incomplete',
+      },
+      isDone ? 'Task marked as done!' : 'Task marked as incomplete!',
+    )
 
   const handleDeleteTask = async (taskId) => {
     setIsDeletingTask(true)
@@ -241,14 +253,32 @@ function TaskList() {
             </li>
           ) : (
             filteredTasks.map((task) => (
-              <li key={task.id}>
+              <li key={task.id} className="task-list__item">
+                <div className="task-item-shell">
+                  <input
+                    type="checkbox"
+                    className="task-item__checkbox"
+                    checked={task.status === 'done'}
+                    disabled={isSavingTask || isDeletingTask}
+                    onChange={(event) => {
+                      void handleToggleTaskDone(task, event.target.checked)
+                    }}
+                    aria-label={
+                      task.status === 'done'
+                        ? `Mark ${task.title} as not done`
+                        : `Mark ${task.title} as done`
+                    }
+                  />
+
                 <button
                   type="button"
                   className={`task-item task-item--${task.status}`}
                   onClick={() => setSelectedTaskId(task.id)}
                 >
                   <span className="task-item__marker" aria-hidden="true" />
-                  <div className="task-item__content">
+                  <div
+                    className={`task-item__content${task.status === 'done' ? ' task-item__content--done' : ''}`}
+                  >
                     <h3>{task.title}</h3>
                     <p>{task.description || 'No description added yet.'}</p>
                   </div>
@@ -260,6 +290,7 @@ function TaskList() {
                     <strong>{taskStatusLabels[task.status]}</strong>
                   </section>
                 </button>
+                </div>
               </li>
             ))
           )}
