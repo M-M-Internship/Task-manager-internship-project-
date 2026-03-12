@@ -1,21 +1,46 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 
-function AddTask({ isOpen, onClose, onAddTask }) {
+const priorityOptions = ['Low', 'Medium', 'High']
+const statusOptions = [
+  { value: 'incomplete', label: 'Incomplete' },
+  { value: 'active', label: 'Active' },
+  { value: 'done', label: 'Done' },
+]
+
+function AddTask({ isOpen, onClose, onAddTask, isSubmitting = false }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [priority, setPriority] = useState('Medium')
+  const [status, setStatus] = useState('incomplete')
   const titleInputRef = useRef(null)
 
-  useEffect(() => {
-    if (!isOpen) {
-      setTitle('')
-      setDescription('')
+  const resetForm = () => {
+    setTitle('')
+    setDescription('')
+    setDeadline('')
+    setPriority('Medium')
+    setStatus('incomplete')
+  }
+
+  const handleClose = () => {
+    if (isSubmitting) {
       return
     }
 
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
+    resetForm()
+    onClose()
+  }
+
+  const handleEscape = useEffectEvent((event) => {
+    if (event.key === 'Escape') {
+      handleClose()
+    }
+  })
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
     }
 
     const previousOverflow = document.body.style.overflow
@@ -30,13 +55,13 @@ function AddTask({ isOpen, onClose, onAddTask }) {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   if (!isOpen) {
     return null
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
@@ -47,14 +72,21 @@ function AddTask({ isOpen, onClose, onAddTask }) {
       return
     }
 
-    onAddTask({
+    const didAddTask = await onAddTask({
       title: trimmedTitle,
       description: trimmedDescription,
+      deadline,
+      priority,
+      status,
     })
+
+    if (didAddTask) {
+      resetForm()
+    }
   }
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={handleClose}>
       <div
         className="dialog-card"
         role="dialog"
@@ -70,20 +102,22 @@ function AddTask({ isOpen, onClose, onAddTask }) {
           <button
             type="button"
             className="dialog-card__close"
-            onClick={onClose}
+            disabled={isSubmitting}
+            onClick={handleClose}
             aria-label="Close add task dialog"
           >
             x
           </button>
         </div>
 
-        <form className="dialog-form" onSubmit={handleSubmit}>
+        <form className="dialog-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
           <label className="dialog-form__field">
             <span>Task name</span>
             <input
               ref={titleInputRef}
               type="text"
               value={title}
+              disabled={isSubmitting}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Finish homepage design"
               required
@@ -94,25 +128,70 @@ function AddTask({ isOpen, onClose, onAddTask }) {
             <span>Description (optional)</span>
             <textarea
               value={description}
+              disabled={isSubmitting}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Add any extra notes for this task"
               rows="4"
             />
           </label>
 
+          <div className="dialog-form__row">
+            <label className="dialog-form__field">
+              <span>Deadline</span>
+              <input
+                type="date"
+                value={deadline}
+                disabled={isSubmitting}
+                onChange={(event) => setDeadline(event.target.value)}
+              />
+            </label>
+
+            <label className="dialog-form__field">
+              <span>Priority</span>
+              <select
+                value={priority}
+                disabled={isSubmitting}
+                onChange={(event) => setPriority(event.target.value)}
+              >
+                {priorityOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="dialog-form__field">
+              <span>Status</span>
+              <select
+                value={status}
+                disabled={isSubmitting}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           <div className="dialog-form__actions">
             <button
               type="button"
               className="dialog-form__button dialog-form__button--ghost"
-              onClick={onClose}
+              disabled={isSubmitting}
+              onClick={handleClose}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="dialog-form__button dialog-form__button--primary"
+              disabled={isSubmitting}
             >
-              Add
+              {isSubmitting ? 'Adding...' : 'Add'}
             </button>
           </div>
         </form>
