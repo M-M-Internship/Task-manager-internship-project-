@@ -1,9 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 import AddTask from '../../components/AddTask.jsx'
 import Desc from '../../components/Desc.jsx'
 import FilterButton from '../../components/FilterButton.jsx'
-import Snackbar from '@mui/material/Snackbar'
-import Alert from '@mui/material/Alert'
+import {
+  createTask,
+  deleteTask,
+  fetchTasks,
+  updateTask,
+} from '../../services/tasksApi.js'
 
 const taskStatusLabels = {
   done: 'Done',
@@ -18,63 +24,82 @@ const emptyStateMessages = {
   incomplete: 'No incomplete tasks at the moment.',
 }
 
-const initialTasks = [
-  {
-    id: 1,
-    title: 'Design the dashboard layout',
-    description: 'UI planning',
-    deadline: '2026-03-14',
-    priority: 'High',
-    status: 'done',
-  },
-  {
-    id: 2,
-    title: 'Build the add-task form',
-    description: 'Component work',
-    deadline: '2026-03-16',
-    priority: 'Medium',
-    status: 'active',
-  },
-  {
-    id: 3,
-    title: 'Connect local task state',
-    description: 'React logic',
-    deadline: '2026-03-18',
-    priority: 'High',
-    status: 'incomplete',
-  },
-  {
-    id: 4,
-    title: 'Polish mobile spacing',
-    description: 'Responsive pass',
-    deadline: '2026-03-19',
-    priority: 'Low',
-    status: 'done',
-  },
-]
+function getTaskErrorMessage(error, fallbackMessage) {
+  if (!error) {
+    return fallbackMessage
+  }
+
+  if (error.code === 'PGRST205' || error.code === '42P01') {
+    return 'Tasks table not found. Run supabase/tasks.sql in Supabase, then refresh.'
+  }
+
+  if (error.code === '42501') {
+    return 'Supabase is blocking task access. Run the policies in supabase/tasks.sql, then refresh.'
+  }
+
+  return error.message ?? fallbackMessage
+}
 
 function TaskList() {
-  const [tasks, setTasks] = useState(initialTasks)
+  const [tasks, setTasks] = useState([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [isSavingTask, setIsSavingTask] = useState(false)
+  const [isDeletingTask, setIsDeletingTask] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [snackbarState, setSnackbarState] = useState({
     open: false,
     message: '',
     severity: 'success',
   })
-  const completedTasks = tasks.filter((task) => task.status === 'done').length
-  const selectedTask =
-    tasks.find((task) => task.id === selectedTaskId) ?? null
-  const filterCounts = {
-    all: tasks.length,
-    done: completedTasks,
-    active: tasks.filter((task) => task.status === 'active').length,
-    incomplete: tasks.filter((task) => task.status === 'incomplete').length,
-  }
-  const filteredTasks = tasks.filter(
-    (task) => activeFilter === 'all' || task.status === activeFilter,
-  )
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadTasks = async () => {
+      setIsLoading(true)
+      setLoadError('')
+
+      try {
+        const storedTasks = await fetchTasks()
+
+        if (ignore) {
+          return
+        }
+
+        setTasks(storedTasks)
+      } catch (error) {
+        if (ignore) {
+          return
+        }
+
+        const message = getTaskErrorMessage(
+          error,
+          'Could not load tasks right now.',
+        )
+
+        setLoadError(message)
+        setSnackbarState({
+          open: true,
+          message,
+          severity: 'error',
+        })
+      } finally {
+        if (!ignore) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadTasks()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const handleSnackbarClose = (_, reason) => {
     if (reason === 'clickaway') {
@@ -95,51 +120,106 @@ function TaskList() {
     })
   }
 
-  const handleAddTask = ({
+  const completedTasks = tasks.filter((task) => task.status === 'done').length
+  const selectedTask =
+    tasks.find((task) => task.id === selectedTaskId) ?? null
+  const filterCounts = {
+    all: tasks.length,
+    done: completedTasks,
+    active: tasks.filter((task) => task.status === 'active').length,
+    incomplete: tasks.filter((task) => task.status === 'incomplete').length,
+  }
+  const filteredTasks = tasks.filter(
+    (task) => activeFilter === 'all' || task.status === activeFilter,
+  )
+
+  const handleAddTask = async ({
     title,
     description,
     deadline,
     priority,
     status,
   }) => {
-    setTasks((currentTasks) => [
-      {
-        id: Date.now(),
+    setIsAddingTask(true)
+
+    try {
+      const createdTask = await createTask({
         title,
         description,
         deadline,
         priority,
         status,
-      },
-      ...currentTasks,
-    ])
-    setIsDialogOpen(false)
-    openSnackbar('Task added successfully!')
+      })
+
+      setTasks((currentTasks) => [createdTask, ...currentTasks])
+      setLoadError('')
+      setIsDialogOpen(false)
+      openSnackbar('Task added successfully!')
+      return true
+    } catch (error) {
+      openSnackbar(
+        getTaskErrorMessage(error, 'Could not add the task right now.'),
+        'error',
+      )
+      return false
+    } finally {
+      setIsAddingTask(false)
+    }
   }
 
-  const handleUpdateTask = (updatedTask) => {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === updatedTask.id ? updatedTask : task,
-      ),
-    )
-    openSnackbar('Task updated successfully!')
+  const handleUpdateTask = async (updatedTask) => {
+    setIsSavingTask(true)
+
+    try {
+      const savedTask = await updateTask(updatedTask)
+
+      setTasks((currentTasks) =>
+        currentTasks.map((task) => (task.id === savedTask.id ? savedTask : task)),
+      )
+      setLoadError('')
+      openSnackbar('Task updated successfully!')
+      return true
+    } catch (error) {
+      openSnackbar(
+        getTaskErrorMessage(error, 'Could not update the task right now.'),
+        'error',
+      )
+      return false
+    } finally {
+      setIsSavingTask(false)
+    }
   }
 
-  const handleDeleteTask = (taskId) => {
-    setTasks((currentTasks) =>
-      currentTasks.filter((task) => task.id !== taskId),
-    )
-    setSelectedTaskId(null)
-    openSnackbar('Task deleted successfully!', 'info')
+  const handleDeleteTask = async (taskId) => {
+    setIsDeletingTask(true)
+
+    try {
+      await deleteTask(taskId)
+
+      setTasks((currentTasks) =>
+        currentTasks.filter((task) => task.id !== taskId),
+      )
+      setSelectedTaskId(null)
+      setLoadError('')
+      openSnackbar('Task deleted successfully!', 'info')
+      return true
+    } catch (error) {
+      openSnackbar(
+        getTaskErrorMessage(error, 'Could not delete the task right now.'),
+        'error',
+      )
+      return false
+    } finally {
+      setIsDeletingTask(false)
+    }
   }
 
   return (
     <>
       <section className="task-list-box">
         <header className="task-list-box__header">
-          <div >
-            <h2 >Tasks </h2>
+          <div>
+            <h2>Tasks</h2>
           </div>
           <span className="task-list-box__badge">
             {completedTasks}/{tasks.length} done
@@ -153,8 +233,12 @@ function TaskList() {
         />
 
         <ul className="task-list" aria-label="Task list">
-          {filteredTasks.length === 0 ? (
-            <li className="task-list__empty">{emptyStateMessages[activeFilter]}</li>
+          {isLoading ? (
+            <li className="task-list__empty">Loading tasks...</li>
+          ) : filteredTasks.length === 0 ? (
+            <li className="task-list__empty">
+              {loadError || emptyStateMessages[activeFilter]}
+            </li>
           ) : (
             filteredTasks.map((task) => (
               <li key={task.id}>
@@ -195,12 +279,15 @@ function TaskList() {
 
       <AddTask
         isOpen={isDialogOpen}
+        isSubmitting={isAddingTask}
         onClose={() => setIsDialogOpen(false)}
         onAddTask={handleAddTask}
       />
 
       <Desc
         task={selectedTask}
+        isSaving={isSavingTask}
+        isDeleting={isDeletingTask}
         onClose={() => setSelectedTaskId(null)}
         onDeleteTask={handleDeleteTask}
         onUpdateTask={handleUpdateTask}

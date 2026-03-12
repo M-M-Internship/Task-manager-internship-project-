@@ -316,11 +316,19 @@
   background: #c2410c;
 }
 
+.task-list-box__button:disabled,
+.dialog-card__close:disabled,
+.dialog-form__button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .task-list-box__button:focus-visible,
 .dialog-card__close:focus-visible,
 .dialog-form__button:focus-visible,
 .dialog-form__field input:focus-visible,
-.dialog-form__field textarea:focus-visible {
+.dialog-form__field textarea:focus-visible,
+.dialog-form__field select:focus-visible {
   outline: 3px solid rgba(234, 88, 12, 0.28);
   outline-offset: 2px;
 }

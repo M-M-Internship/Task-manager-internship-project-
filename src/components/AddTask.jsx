@@ -7,7 +7,7 @@ const statusOptions = [
   { value: 'done', label: 'Done' },
 ]
 
-function AddTask({ isOpen, onClose, onAddTask }) {
+function AddTask({ isOpen, onClose, onAddTask, isSubmitting = false }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -24,6 +24,10 @@ function AddTask({ isOpen, onClose, onAddTask }) {
   }
 
   const handleClose = () => {
+    if (isSubmitting) {
+      return
+    }
+
     resetForm()
     onClose()
   }
@@ -57,7 +61,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
     return null
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
@@ -68,14 +72,17 @@ function AddTask({ isOpen, onClose, onAddTask }) {
       return
     }
 
-    onAddTask({
+    const didAddTask = await onAddTask({
       title: trimmedTitle,
       description: trimmedDescription,
       deadline,
       priority,
       status,
     })
-    resetForm()
+
+    if (didAddTask) {
+      resetForm()
+    }
   }
 
   return (
@@ -95,6 +102,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
           <button
             type="button"
             className="dialog-card__close"
+            disabled={isSubmitting}
             onClick={handleClose}
             aria-label="Close add task dialog"
           >
@@ -102,13 +110,14 @@ function AddTask({ isOpen, onClose, onAddTask }) {
           </button>
         </div>
 
-        <form className="dialog-form" onSubmit={handleSubmit}>
+        <form className="dialog-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
           <label className="dialog-form__field">
             <span>Task name</span>
             <input
               ref={titleInputRef}
               type="text"
               value={title}
+              disabled={isSubmitting}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Finish homepage design"
               required
@@ -119,6 +128,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
             <span>Description (optional)</span>
             <textarea
               value={description}
+              disabled={isSubmitting}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Add any extra notes for this task"
               rows="4"
@@ -131,6 +141,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
               <input
                 type="date"
                 value={deadline}
+                disabled={isSubmitting}
                 onChange={(event) => setDeadline(event.target.value)}
               />
             </label>
@@ -139,6 +150,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
               <span>Priority</span>
               <select
                 value={priority}
+                disabled={isSubmitting}
                 onChange={(event) => setPriority(event.target.value)}
               >
                 {priorityOptions.map((option) => (
@@ -153,6 +165,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
               <span>Status</span>
               <select
                 value={status}
+                disabled={isSubmitting}
                 onChange={(event) => setStatus(event.target.value)}
               >
                 {statusOptions.map((option) => (
@@ -168,6 +181,7 @@ function AddTask({ isOpen, onClose, onAddTask }) {
             <button
               type="button"
               className="dialog-form__button dialog-form__button--ghost"
+              disabled={isSubmitting}
               onClick={handleClose}
             >
               Cancel
@@ -175,8 +189,9 @@ function AddTask({ isOpen, onClose, onAddTask }) {
             <button
               type="submit"
               className="dialog-form__button dialog-form__button--primary"
+              disabled={isSubmitting}
             >
-              Add
+              {isSubmitting ? 'Adding...' : 'Add'}
             </button>
           </div>
         </form>

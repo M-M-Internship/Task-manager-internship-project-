@@ -26,7 +26,14 @@ function formatDeadline(deadline) {
   })
 }
 
-function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
+function Desc({
+  task,
+  onClose,
+  onDeleteTask,
+  onUpdateTask,
+  isSaving = false,
+  isDeleting = false,
+}) {
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -34,18 +41,34 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
   const [priority, setPriority] = useState('Medium')
   const [status, setStatus] = useState('incomplete')
   const titleInputRef = useRef(null)
+  const isBusy = isSaving || isDeleting
 
   const handleClose = () => {
+    if (isBusy) {
+      return
+    }
+
     setIsEditing(false)
     onClose()
   }
 
-  const handleDelete = () => {
-    setIsEditing(false)
-    onDeleteTask(task.id)
+  const handleDelete = async () => {
+    if (isBusy) {
+      return
+    }
+
+    const didDeleteTask = await onDeleteTask(task.id)
+
+    if (didDeleteTask) {
+      setIsEditing(false)
+    }
   }
 
   const handleStartEditing = () => {
+    if (isBusy) {
+      return
+    }
+
     setTitle(task.title)
     setDescription(task.description ?? '')
     setDeadline(task.deadline ?? '')
@@ -87,7 +110,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
     return null
   }
 
-  const handleUpdate = (event) => {
+  const handleUpdate = async (event) => {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
@@ -97,7 +120,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
       return
     }
 
-    onUpdateTask({
+    const didUpdateTask = await onUpdateTask({
       ...task,
       title: trimmedTitle,
       description: description.trim(),
@@ -105,10 +128,17 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
       priority,
       status,
     })
-    setIsEditing(false)
+
+    if (didUpdateTask) {
+      setIsEditing(false)
+    }
   }
 
   const handleCancelEdit = () => {
+    if (isBusy) {
+      return
+    }
+
     setIsEditing(false)
   }
 
@@ -129,6 +159,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
           <button
             type="button"
             className="dialog-card__close"
+            disabled={isBusy}
             onClick={handleClose}
             aria-label="Close task details dialog"
           >
@@ -137,13 +168,14 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
         </div>
 
         {isEditing ? (
-          <form className="dialog-form" onSubmit={handleUpdate}>
+          <form className="dialog-form" onSubmit={handleUpdate} aria-busy={isBusy}>
             <label className="dialog-form__field">
               <span>Task name</span>
               <input
                 ref={titleInputRef}
                 type="text"
                 value={title}
+                disabled={isBusy}
                 onChange={(event) => setTitle(event.target.value)}
                 required
               />
@@ -153,6 +185,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
               <span>Description</span>
               <textarea
                 value={description}
+                disabled={isBusy}
                 onChange={(event) => setDescription(event.target.value)}
                 rows="4"
               />
@@ -164,6 +197,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                 <input
                   type="date"
                   value={deadline}
+                  disabled={isBusy}
                   onChange={(event) => setDeadline(event.target.value)}
                 />
               </label>
@@ -172,6 +206,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                 <span>Priority</span>
                 <select
                   value={priority}
+                  disabled={isBusy}
                   onChange={(event) => setPriority(event.target.value)}
                 >
                   {priorityOptions.map((option) => (
@@ -186,6 +221,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                 <span>Status</span>
                 <select
                   value={status}
+                  disabled={isBusy}
                   onChange={(event) => setStatus(event.target.value)}
                 >
                   {statusOptions.map((option) => (
@@ -201,6 +237,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
               <button
                 type="button"
                 className="dialog-form__button dialog-form__button--danger dialog-form__button--with-icon"
+                disabled={isBusy}
                 onClick={handleDelete}
               >
                 <DeleteOutlineRoundedIcon
@@ -208,11 +245,12 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                   fontSize="small"
                   aria-hidden="true"
                 />
-                Delete Task
+                {isDeleting ? 'Deleting...' : 'Delete Task'}
               </button>
               <button
                 type="button"
                 className="dialog-form__button dialog-form__button--ghost"
+                disabled={isBusy}
                 onClick={handleCancelEdit}
               >
                 Cancel
@@ -220,8 +258,9 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
               <button
                 type="submit"
                 className="dialog-form__button dialog-form__button--primary"
+                disabled={isBusy}
               >
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>
@@ -257,6 +296,7 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
               <button
                 type="button"
                 className="dialog-form__button dialog-form__button--danger dialog-form__button--with-icon"
+                disabled={isBusy}
                 onClick={handleDelete}
               >
                 <DeleteOutlineRoundedIcon
@@ -264,11 +304,12 @@ function Desc({ task, onClose, onDeleteTask, onUpdateTask }) {
                   fontSize="small"
                   aria-hidden="true"
                 />
-                Delete Task
+                {isDeleting ? 'Deleting...' : 'Delete Task'}
               </button>
               <button
                 type="button"
                 className="dialog-form__button dialog-form__button--primary dialog-form__button--with-icon"
+                disabled={isBusy}
                 onClick={handleStartEditing}
               >
                 <EditOutlinedIcon
