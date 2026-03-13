@@ -14,8 +14,9 @@ function normalizeTask(task) {
   }
 }
 
-function serializeTask(task) {
+function serializeTask(task, userId) {
   return {
+    ...(userId ? { user_id: userId } : {}),
     title: task.title.trim(),
     description: task.description?.trim() || null,
     deadline: task.deadline || null,
@@ -24,11 +25,17 @@ function serializeTask(task) {
   }
 }
 
-export async function fetchTasks() {
-  const { data, error } = await supabase
+export async function fetchTasks(userId) {
+  let query = supabase
     .from(TASKS_TABLE)
     .select('*')
     .order('created_at', { ascending: false })
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw error
@@ -37,10 +44,10 @@ export async function fetchTasks() {
   return data.map(normalizeTask)
 }
 
-export async function createTask(task) {
+export async function createTask(task, userId) {
   const { data, error } = await supabase
     .from(TASKS_TABLE)
-    .insert(serializeTask(task))
+    .insert(serializeTask(task, userId))
     .select()
     .single()
 
@@ -51,15 +58,19 @@ export async function createTask(task) {
   return normalizeTask(data)
 }
 
-export async function updateTask(task) {
+export async function updateTask(task, userId) {
   const { id, ...taskFields } = task
 
-  const { data, error } = await supabase
+  let query = supabase
     .from(TASKS_TABLE)
-    .update(serializeTask(taskFields))
+    .update(serializeTask(taskFields, userId))
     .eq('id', id)
-    .select()
-    .single()
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query.select().single()
 
   if (error) {
     throw error
@@ -68,8 +79,14 @@ export async function updateTask(task) {
   return normalizeTask(data)
 }
 
-export async function deleteTask(taskId) {
-  const { error } = await supabase.from(TASKS_TABLE).delete().eq('id', taskId)
+export async function deleteTask(taskId, userId) {
+  let query = supabase.from(TASKS_TABLE).delete().eq('id', taskId)
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  const { error } = await query
 
   if (error) {
     throw error

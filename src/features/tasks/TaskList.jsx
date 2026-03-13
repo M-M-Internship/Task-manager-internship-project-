@@ -24,23 +24,63 @@ const emptyStateMessages = {
   incomplete: 'No incomplete tasks at the moment.',
 }
 
+function getTaskTimelineValue(task) {
+  if (task.deadline) {
+    return new Date(`${task.deadline}T00:00:00`).getTime()
+  }
+
+  return Number.POSITIVE_INFINITY
+}
+
+function sortTasksForTimeline(tasks) {
+  return [...tasks].sort((taskA, taskB) => {
+    const timelineDifference =
+      getTaskTimelineValue(taskA) - getTaskTimelineValue(taskB)
+
+    if (timelineDifference !== 0) {
+      return timelineDifference
+    }
+
+    const createdAtA = taskA.created_at
+      ? new Date(taskA.created_at).getTime()
+      : 0
+    const createdAtB = taskB.created_at
+      ? new Date(taskB.created_at).getTime()
+      : 0
+
+    if (createdAtA !== createdAtB) {
+      return createdAtB - createdAtA
+    }
+
+    return taskA.title.localeCompare(taskB.title)
+  })
+}
+
 function getTaskErrorMessage(error, fallbackMessage) {
   if (!error) {
     return fallbackMessage
   }
 
-  if (error.code === 'PGRST205' || error.code === '42P01') {
-    return 'Tasks table not found. Run supabase/tasks.sql in Supabase, then refresh.'
+  if (
+    error.code === 'PGRST205' ||
+    error.code === '42P01' ||
+    error.code === '42703'
+  ) {
+    return 'Tasks auth schema is missing. Run the updated supabase/tasks.sql in Supabase, then refresh.'
   }
 
   if (error.code === '42501') {
-    return 'Supabase is blocking task access. Run the policies in supabase/tasks.sql, then refresh.'
+    return 'Supabase is blocking task access. Run the updated policies in supabase/tasks.sql, then refresh.'
+  }
+
+  if (error.code === '23503') {
+    return 'Supabase could not link this task to your account. Run the updated supabase/tasks.sql, then try again.'
   }
 
   return error.message ?? fallbackMessage
 }
 
-function TaskList() {
+function TaskList({ user }) {
   const [tasks, setTasks] = useState([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
@@ -59,12 +99,19 @@ function TaskList() {
   useEffect(() => {
     let ignore = false
 
+    if (!user?.id) {
+      setTasks([])
+      setLoadError('')
+      setIsLoading(false)
+      return undefined
+    }
+
     const loadTasks = async () => {
       setIsLoading(true)
       setLoadError('')
 
       try {
-        const storedTasks = await fetchTasks()
+        const storedTasks = await fetchTasks(user.id)
 
         if (ignore) {
           return
@@ -99,7 +146,7 @@ function TaskList() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [user?.id])
 
   const handleSnackbarClose = (_, reason) => {
     if (reason === 'clickaway') {
@@ -129,8 +176,8 @@ function TaskList() {
     active: tasks.filter((task) => task.status === 'active').length,
     incomplete: tasks.filter((task) => task.status === 'incomplete').length,
   }
-  const filteredTasks = tasks.filter(
-    (task) => activeFilter === 'all' || task.status === activeFilter,
+  const filteredTasks = sortTasksForTimeline(
+    tasks.filter((task) => activeFilter === 'all' || task.status === activeFilter),
   )
 
   const handleAddTask = async ({
@@ -143,13 +190,16 @@ function TaskList() {
     setIsAddingTask(true)
 
     try {
-      const createdTask = await createTask({
-        title,
-        description,
-        deadline,
-        priority,
-        status,
-      })
+      const createdTask = await createTask(
+        {
+          title,
+          description,
+          deadline,
+          priority,
+          status,
+        },
+        user.id,
+      )
 
       setTasks((currentTasks) => [createdTask, ...currentTasks])
       setLoadError('')
@@ -171,7 +221,7 @@ function TaskList() {
     setIsSavingTask(true)
 
     try {
-      const savedTask = await updateTask(updatedTask)
+      const savedTask = await updateTask(updatedTask, user.id)
 
       setTasks((currentTasks) =>
         currentTasks.map((task) => (task.id === savedTask.id ? savedTask : task)),
@@ -206,7 +256,7 @@ function TaskList() {
     setIsDeletingTask(true)
 
     try {
-      await deleteTask(taskId)
+      await deleteTask(taskId, user.id)
 
       setTasks((currentTasks) =>
         currentTasks.filter((task) => task.id !== taskId),
@@ -231,11 +281,27 @@ function TaskList() {
       <section className="task-list-box">
         <header className="task-list-box__header">
           <div>
+            <p className="task-list-box__eyebrow">Task board</p>
             <h2>Tasks</h2>
+            <p className="task-list-box__subtext">
+              Keep everything organized in your private workspace.
+            </p>
           </div>
-          <span className="task-list-box__badge">
-            {completedTasks}/{tasks.length} done
-          </span>
+          <div className="task-list-box__header-actions">
+            <span className="task-list-box__badge">
+              {completedTasks}/{tasks.length} done
+            </span>
+            <button
+              type="button"
+              className="task-list-box__button"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              <span className="task-list-box__button-icon" aria-hidden="true">
+                +
+              </span>
+              Add Task
+            </button>
+          </div>
         </header>
 
         <FilterButton
@@ -244,68 +310,59 @@ function TaskList() {
           onFilterChange={setActiveFilter}
         />
 
-        <ul className="task-list" aria-label="Task list">
-          {isLoading ? (
-            <li className="task-list__empty">Loading tasks...</li>
-          ) : filteredTasks.length === 0 ? (
-            <li className="task-list__empty">
-              {loadError || emptyStateMessages[activeFilter]}
-            </li>
-          ) : (
-            filteredTasks.map((task) => (
-              <li key={task.id} className="task-list__item">
-                <div className="task-item-shell">
-                  <input
-                    type="checkbox"
-                    className="task-item__checkbox"
-                    checked={task.status === 'done'}
-                    disabled={isSavingTask || isDeletingTask}
-                    onChange={(event) => {
-                      void handleToggleTaskDone(task, event.target.checked)
-                    }}
-                    aria-label={
-                      task.status === 'done'
-                        ? `Mark ${task.title} as not done`
-                        : `Mark ${task.title} as done`
-                    }
-                  />
-
-                <button
-                  type="button"
-                  className={`task-item task-item--${task.status}`}
-                  onClick={() => setSelectedTaskId(task.id)}
-                >
-                  <span className="task-item__marker" aria-hidden="true" />
-                  <div
-                    className={`task-item__content${task.status === 'done' ? ' task-item__content--done' : ''}`}
-                  >
-                    <h3>{task.title}</h3>
-                    <p>{task.description || 'No description added yet.'}</p>
-                  </div>
-                  <section
-                    className={`task-item__status task-item__status--${task.status}`}
-                    aria-label={`Task status ${taskStatusLabels[task.status]}`}
-                  >
-                    <span>Status</span>
-                    <strong>{taskStatusLabels[task.status]}</strong>
-                  </section>
-                </button>
-                </div>
+        <div className="task-list-box__scroll">
+          <ul className="task-list" aria-label="Task list">
+            {isLoading ? (
+              <li className="task-list__empty">Loading tasks...</li>
+            ) : filteredTasks.length === 0 ? (
+              <li className="task-list__empty">
+                {loadError || emptyStateMessages[activeFilter]}
               </li>
-            ))
-          )}
-        </ul>
+            ) : (
+              filteredTasks.map((task) => (
+                <li key={task.id} className="task-list__item">
+                  <div className="task-item-shell">
+                    <input
+                      type="checkbox"
+                      className="task-item__checkbox"
+                      checked={task.status === 'done'}
+                      disabled={isSavingTask || isDeletingTask}
+                      onChange={(event) => {
+                        void handleToggleTaskDone(task, event.target.checked)
+                      }}
+                      aria-label={
+                        task.status === 'done'
+                          ? `Mark ${task.title} as not done`
+                          : `Mark ${task.title} as done`
+                      }
+                    />
 
-        <button
-          type="button"
-          className="task-list-box__button"
-          onClick={() => setIsDialogOpen(true)}
-        >
-          <span className="task-list-box__button-icon" aria-hidden="true">
-            +
-          </span>
-          Add Task
-        </button>
+                    <button
+                      type="button"
+                      className={`task-item task-item--${task.status}`}
+                      onClick={() => setSelectedTaskId(task.id)}
+                    >
+                      <span className="task-item__marker" aria-hidden="true" />
+                      <div
+                        className={`task-item__content${task.status === 'done' ? ' task-item__content--done' : ''}`}
+                      >
+                        <h3>{task.title}</h3>
+                        <p>{task.description || 'No description added yet.'}</p>
+                      </div>
+                      <section
+                        className={`task-item__status task-item__status--${task.status}`}
+                        aria-label={`Task status ${taskStatusLabels[task.status]}`}
+                      >
+                        <span>Status</span>
+                        <strong>{taskStatusLabels[task.status]}</strong>
+                      </section>
+                    </button>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
       </section>
 
       <AddTask
